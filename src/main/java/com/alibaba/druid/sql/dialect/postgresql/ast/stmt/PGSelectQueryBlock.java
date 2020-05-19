@@ -21,21 +21,21 @@ import java.util.List;
 import com.alibaba.druid.sql.ast.SQLExpr;
 import com.alibaba.druid.sql.ast.SQLOrderBy;
 import com.alibaba.druid.sql.ast.statement.SQLSelectQueryBlock;
+import com.alibaba.druid.sql.dialect.mysql.ast.statement.MySqlSelectQueryBlock;
 import com.alibaba.druid.sql.dialect.postgresql.ast.PGSQLObject;
 import com.alibaba.druid.sql.dialect.postgresql.ast.PGSQLObjectImpl;
 import com.alibaba.druid.sql.dialect.postgresql.visitor.PGASTVisitor;
 import com.alibaba.druid.sql.visitor.SQLASTVisitor;
 import com.alibaba.druid.util.JdbcConstants;
 
-public class PGSelectQueryBlock extends SQLSelectQueryBlock implements PGSQLObject{
+public class PGSelectQueryBlock extends SQLSelectQueryBlock implements PGSQLObject {
 
     private List<SQLExpr> distinctOn = new ArrayList<SQLExpr>(2);
-    private WindowClause  window;
+    private WindowClause window;
 
-    private SQLOrderBy    orderBy;
-    private FetchClause   fetch;
-    private ForClause     forClause;
-    private IntoOption    intoOption;
+    private FetchClause fetch;
+    private ForClause forClause;
+    private IntoOption intoOption;
 
     public static enum IntoOption {
         TEMPORARY, TEMP, UNLOGGED
@@ -122,7 +122,7 @@ public class PGSelectQueryBlock extends SQLSelectQueryBlock implements PGSQLObje
 
     public static class WindowClause extends PGSQLObjectImpl {
 
-        private SQLExpr       name;
+        private SQLExpr name;
         private List<SQLExpr> definition = new ArrayList<SQLExpr>(2);
 
         public SQLExpr getName() {
@@ -149,6 +149,19 @@ public class PGSelectQueryBlock extends SQLSelectQueryBlock implements PGSQLObje
             }
             visitor.endVisit(this);
         }
+
+        public WindowClause clone() {
+            final WindowClause x = new WindowClause();
+            if (name != null)
+                x.setName(name.clone());
+            if (definition != null)
+                for (SQLExpr expr : definition) {
+                    final SQLExpr clone = expr.clone();
+                    clone.setParent(x);
+                    x.definition.add(clone);
+                }
+            return x;
+        }
     }
 
     public static class FetchClause extends PGSQLObjectImpl {
@@ -157,7 +170,7 @@ public class PGSelectQueryBlock extends SQLSelectQueryBlock implements PGSQLObje
             FIRST, NEXT
         }
 
-        private Option  option;
+        private Option option;
         private SQLExpr count;
 
         public Option getOption() {
@@ -184,6 +197,14 @@ public class PGSelectQueryBlock extends SQLSelectQueryBlock implements PGSQLObje
             visitor.endVisit(this);
         }
 
+        public FetchClause clone() {
+            final FetchClause x = new FetchClause();
+            x.option = option;
+            if (count != null)
+                x.setCount(count.clone());
+            return x;
+        }
+
     }
 
     public static class ForClause extends PGSQLObjectImpl {
@@ -193,8 +214,8 @@ public class PGSelectQueryBlock extends SQLSelectQueryBlock implements PGSQLObje
         }
 
         private List<SQLExpr> of = new ArrayList<SQLExpr>(2);
-        private boolean       noWait;
-        private Option        option;
+        private boolean noWait;
+        private Option option;
 
         public Option getOption() {
             return option;
@@ -227,8 +248,47 @@ public class PGSelectQueryBlock extends SQLSelectQueryBlock implements PGSQLObje
             }
             visitor.endVisit(this);
         }
+
+        public ForClause clone() {
+            final ForClause x = new ForClause();
+            x.noWait = noWait;
+            x.option = option;
+            if (of != null) {
+                for (SQLExpr expr : of) {
+                    final SQLExpr clone = expr.clone();
+                    clone.setParent(x);
+                    x.of.add(clone);
+                }
+            }
+
+            return x;
+        }
     }
 
+    @Override
+    public PGSelectQueryBlock clone() {
+        PGSelectQueryBlock x = new PGSelectQueryBlock();
+        cloneTo(x);
 
+        x.intoOption = intoOption;
 
+        if (distinctOn != null) {
+            for (SQLExpr expr : distinctOn) {
+                final SQLExpr clone = expr.clone();
+                clone.setParent(x);
+                x.distinctOn.add(clone);
+            }
+        }
+
+        if (window != null)
+            x.setWindow(window.clone());
+
+        if (fetch != null)
+            x.setFetch(fetch.clone());
+
+        if (forClause != null)
+            x.setForClause(forClause.clone());
+
+        return x;
+    }
 }
